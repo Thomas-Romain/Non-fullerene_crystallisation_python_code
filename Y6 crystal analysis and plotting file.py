@@ -530,7 +530,7 @@ def SavePlot(x, titles, titless, Newmodel, number):
     # ax.legend(frameon = False, ncol = 1, title=str(array[int((Newmodel)-1)]) + ' model')#loc='lower right'
     ax.legend(frameon=False, ncol=1, title = str(TTitle[Newmodel]))
     
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
     # fig.savefig('Paperfigures'+ titl + titless + str(number)+ '.svg',bbox_inches='tight')
     # fig.savefig('v with space'+ titl + titless + str(number)+ '.png',bbox_inches='tight') #Save functionality, hash out when not using
@@ -602,7 +602,7 @@ if BigPlot ==1:
     ax.legend(frameon = False, ncol = 1, title=str(array[int((Newmodel)-1)]) + ' model')#loc='lower right'
     TTitle = ['Cannot-be-called-no-0-model','Singlet-only','Optical depth','Triplet-included','Free-charge model','singlet-triplet annihilation model']
     # ax.legend(frameon=False, ncol=1, title= str(TTitle[Newmodel])+' model')
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
     # fig.savefig('varying STA.png',bbox_inches='tight')
     # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.svg',bbox_inches='tight') #Save the plots as png or svg as you desire
@@ -637,7 +637,7 @@ if VarySTA == True:
     handles, labels = plt.gca().get_legend_handles_labels()
     order = [5,0,1,2,3,4]
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{STA}$ multiple')
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
     # fig.savefig('varying STA.svg',bbox_inches='tight')
     plt.show()
@@ -669,7 +669,7 @@ if VaryTTA == True:
     handles, labels = plt.gca().get_legend_handles_labels()
     order = [6,5,4,3,2,1,0]  
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{TTA}$ multiple')
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
     # fig.savefig('varying TTA.svg',bbox_inches='tight')
     # # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.png',bbox_inches='tight') #Save the plots as png or svg as you desire
@@ -699,7 +699,7 @@ if VaryISC == True:
     ax.tick_params(axis='both', which='major', labelsize=12)
     # ax.legend(frameon = False, ncol = 1, title=str(array[int((Newmodel)-1)]) + ' model')#loc='lower right'
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{isc}$ multiple') 
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
     # fig.savefig('varying ISC.svg',bbox_inches='tight')
     # # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.png',bbox_inches='tight') #Save the plots as png or svg as you desire
@@ -729,7 +729,7 @@ if VaryKTS == True:
     ax.tick_params(axis='both', which='major', labelsize=12)
     # ax.legend(frameon = False, ncol = 1, title=str(array[int((Newmodel)-1)]) + ' model')#loc='lower right'
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{ts}$ multiple') 
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
     # fig.savefig('varying ts.svg',bbox_inches='tight')
     # # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.png',bbox_inches='tight') #Save the plots as png or svg as you desire
@@ -754,7 +754,7 @@ if ThreeinOne == True:
     ax.tick_params(axis='both', which='major', labelsize=13)
     # ax.legend(frameon = False, ncol = 1, title='70 nm fitting')#loc='lower right'
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='70 nm fitting') 
-    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('Normalised PL events (A.U)')
+    plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 0.75), plt.xlim(0.2, 500)
     # fig.savefig('ThreeinOne.svg',bbox_inches='tight')
     plt.show()
@@ -872,5 +872,6 @@ if TCSPCIntensity==1:
 
 
 # x = np.genfromtxt(r"C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\TCSPC\Comparing fluences normalised.csv", delimiter=',', skip_header = 1)
+
 
 print('All done :)')
