@@ -1,114 +1,115 @@
-Import = True               #Imports all necessary libraries / some definitions for plotting / constants for calculations. 
-if Import == True:          #I put it in a T/F because I wanted to minimise it while I worked on other things
-    import numpy as np
-    import os
-    import sif_parser      #This is the only thing that might not be necessary, it's useful for viewing sif files that our spectrmeter gives out
+#%% Import
+import numpy as np
+import os
+import sif_parser      #This is the only thing that might not be necessary, it's useful for viewing sif files that our spectrmeter gives out
                            #That being said, I manage to average the data when it's taken at differing cycle numbers, which wouldn't be possible otherwise
-    import matplotlib.pyplot as plt
-    from scipy.stats import norm            #This is being imported after the laser models were introduced. I should go back and remove my Norm function at some point
-    from scipy.integrate import solve_ivp
-    from lmfit import Model as MDL  #For fitting TCSPC data?
-    
-    #General definitions
-    k,OD, ft,R0 =1.3, 2, 150,1.5e-9
-    h = 6.626e-34
-    c=2.998e8
-    wavelength = 800e-9
-    alpha = 4*np.pi*k/wavelength
-    tamma = np.logspace(-15,-25,num=500)
-    
-    #Defining Mike's simple optical model & all associated variables
-    slice_number = 8
-    num = np.arange(slice_number) #Proves an arrangement of 1 through to *slice_number* to be used in model2
-    thickness_xtal = 200e-9
-    dx = thickness_xtal / slice_number
+import matplotlib.pyplot as plt
+from scipy.stats import norm            #This is being imported after the laser models were introduced. I should go back and remove my Norm function at some point
+from scipy.integrate import solve_ivp
+from lmfit import Model as MDL  #For fitting TCSPC data?
+import sys            #Some models take a very long time to calculate, this is input so I know they're still running even if nothing is happening 
+import time
 
-    pulse_time = np.arange(0, 1e-12, 1e-15)
-    postpulse_time = 2 * np.logspace(-12, -5, 200)
-    time_PL = np.concatenate((pulse_time, postpulse_time))
+start_time = time.time()
 
-    #Defining fig and ax for the defined Plot variable thingy haha look at me I almost know what I'm talking about 
-    # plt.figure(figsize=(10,6)) 
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
-    
-    #Rate constants for the triplet-model
-    krad = 2.3e8 #was 2.3e8 prior to edge crystal adjustment
-    kisc = 1e8
-    knr = 1 / (1500e-12) #1500e-12
-    kradnr = krad + knr+kisc
-    kb = 1.5e-8
-    kqr = 1/(1e-1)
-    ktta = .8e-11
-    kts = .25*kb
-    ktr = 1e4
-    tau = 1e9*(1/kradnr)
-    L_D = 1e9*np.sqrt(6*kb*1e-6*(1/kradnr)/(np.pi*4*1.5e-9))
+#General definitions
+k,OD, ft,R0 =1.3, 2, 150,1.5e-9
+h = 6.626e-34
+c=2.998e8
+wavelength = 800e-9
+alpha = 4*np.pi*k/wavelength
+tamma = np.logspace(-15,-25,num=500)
 
-    #FC model  Original values = 6.3e8, 1/2017e-12,5e12,5.8e12,krad1+knr1, 6.5e-8, 2e-8, kenc1, 7e-11, ktta1, ktta
-    krad1 = 6.3e8
-    knr1 = 1 / (2017e-12)
-    kr1 = 5e12
-    kcs1 = 5.8e12
-    kradnr1 = krad1 + knr1
-    kb1 = 6.5e-8
-    kenc1 = 2e-8
-    ksrh1 = kenc1
-    ktta1 = 7e-11
-    kTC1 = ktta1
-    # kTC1 = ktta
-    # L_D1 = 1e9*np.sqrt(6*kb1*1e-6*(1/kradnr1)/(np.pi*4*1.5e-9))
+#Defining Mike's simple optical model & all associated variables
+slice_number = 8
+num = np.arange(slice_number) #Proves an arrangement of 1 through to *slice_number* to be used in model2
+thickness_xtal = 200e-9
+dx = thickness_xtal / slice_number
+pulse_time = np.arange(0, 1e-12, 1e-15)
+postpulse_time = 2 * np.logspace(-12, -5, 200)
+time_PL = np.concatenate((pulse_time, postpulse_time))
 
-    
-    #Model5 rate constants :(    original values are 2.3e8, 1e8, 1/(1217e-12), krad2+knr2+kisc2, 1.5e-8,1/(1e-1), .8e-11, .25*kb2, 1e4, 0.1*kb2
-    krad2 = 2.3e8
-    kisc2 = 1e8
-    knr2 = 1 / (1500e-12)
-    kradnr2 = krad2 + knr2+kisc2
-    kb2 = 1.5e-8
-    kqr2 = 1/(1e-1)
-    ktta2 = .8e-11
-    kts2 = .25*kb2
-    ktr2 = 1e4
-    ksta2 = 0.1*kb2 ##this is the singlet triplet annihilation constant
-    
-    #TestForTamir adjustment
-    knr3 = 1/(633e-12)
-    kradnr3 = krad2 + knr3+kisc2
-    
-    knr12 = 1/(1500e-12)
-    kradnr12 = krad1 + knr12
-   
-    # L_D = 1e9*np.sqrt(6*kb2*1e-6*(1/kradnr2)/(np.pi*4*1.5e-9))
+#File inputs, input here so you can change what file is being called easily 
+FilmOne = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 1"                          #Filepath for Film Samples 1
+FilmTwo = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 2"                          #Filepath for Film Samples 2
+CrystalOne = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1"                    #Filepath for Crystal Samples 1
+CrystalTwo = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 2"                    #Filepath for Crystal Samples 2
+TCSPCData = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\FLIM data\FLIM data for python.csv"    #Filepath for FLIM data with ultrafast component cut off 
+CrystalDecay = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal decay trace"                #Filepath for Crystal decay trace
+FilmDecay = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film decay trace"                      #Filepath for Film decay trace
+TCSPCIntensityFile = r"C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\TCSPC\TEst4Pyth.csv"             #Filepath for high and low fluence TCSPC data
 
-    tau = 1e9*(1/kradnr2)
+#Rate constants for the triplet-model
+krad = 2.3e8 #was 2.3e8 prior to edge crystal adjustment
+kisc = 1e8
+knr = 1 / (1500e-12) #1500e-12
+kradnr = krad + knr+kisc
+kb = 1.5e-8
+kqr = 1/(1e-1)
+ktta = .8e-11
+kts = .25*kb
+ktr = 1e4
+tau = 1e9*(1/kradnr)
+L_D = 1e9*np.sqrt(6*kb*1e-6*(1/kradnr)/(np.pi*4*1.5e-9))
+
+#FC model  Original values = 6.3e8, 1/2017e-12,5e12,5.8e12,krad1+knr1, 6.5e-8, 2e-8, kenc1, 7e-11, ktta1, ktta
+krad1 = 6.3e8
+knr1 = 1 / (2017e-12)
+kr1 = 5e12
+kcs1 = 5.8e12
+kradnr1 = krad1 + knr1
+kb1 = 6.5e-8
+kenc1 = 2e-8
+ksrh1 = kenc1
+ktta1 = 7e-11
+kTC1 = ktta1
     
-    plt.rcParams.update({'font.size': 11})
+#Model5 rate constants :(    original values are 2.3e8, 1e8, 1/(1217e-12), krad2+knr2+kisc2, 1.5e-8,1/(1e-1), .8e-11, .25*kb2, 1e4, 0.1*kb2
+krad2 = 2.3e8
+kisc2 = 1e8
+knr2 = 1 / (1500e-12)
+kradnr2 = krad2 + knr2+kisc2
+kb2 = 1.5e-8
+kqr2 = 1/(1e-1)
+ktta2 = .8e-11
+kts2 = .25*kb2
+ktr2 = 1e4
+ksta2 = 0.1*kb2 ##this is the singlet triplet annihilation constant
     
-    ###Defining these things for changing plots. Keep these as 0, edit the ones below the loading-the-data section to keep things sensible
-    ErrorPlot, VaryISC, VaryTTA, VarySTA, VaryKTS, ThreeinOne, TCSPCPlot, BigPlot, TestForTamir, oplot, ModelTrue, Ms, TCSPCIntensity = 0,0,0,0,0,0,0,0,0,0,0,0,0
+#TestForTamir adjustment
+knr3 = 1/(633e-12)
+kradnr3 = krad2 + knr3+kisc2  
+knr12 = 1/(1500e-12)
+kradnr12 = krad1 + knr12
+tau = 1e9*(1/kradnr2)
     
-    #A few minor things, defining colours and titles for saving the graphs more efficiently?
-    colourss = [['#fdcc8a','#fc8d59','#e34a33','#b30000','#fef0d9'], #Red/orange    0     A series of colour schemes to plot the graphs with. 
-               ['#b3cde3','#8c96c6','#8856a7','#810f7c'], #Purple        1      I couldn't get Mike's fancy code to work, so I manually input hash codes
-               ['#c2e699','#78c679','#31a354','#006837'], #Green/yellow  2      This is not ideal, but I get to pick the exact colours I want :)
+##Defining these things for changing plots. Keep these as 0, edit the ones below the loading-the-data section to keep things sensible
+ErrorPlot, VaryISC, VaryTTA, VarySTA, VaryKTS, ThreeinOne, TCSPCPlot, BigPlot, TestForTamir, oplot, ModelTrue, Ms, TCSPCIntensity, Kinetics, Tpopplot= 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+    
+#A few minor things, defining colours and titles for saving the graphs more efficiently (saving values in the 'bigplot' section to a model name)
+colourss = [['#fdcc8a','#fc8d59','#e34a33','#b30000','#fef0d9'], #Red/orange    0     A series of colour schemes to plot the graphs with. 
+               ['#b3cde3','#8c96c6','#8856a7','#810f7c'], #Purple        1      I couldn't get Mike's code to work, so I manually input hash codes
+               ['#c2e699','#78c679','#31a354','#006837'], #Green/yellow  2      This is not ideal, but lets me keep the colours consistant 
                ['#cccccc','#969696','#636363','#252525'], #Noir          3
                ['#b30000','#810f7c','#e34a33','#8856a7']] #New colour purple/red 4
-    colours = colourss[4]
-    array = ['Thin film','Weighted averages','Triplet-included','Free-charges included', 'singlet-triplet annihilation']
-    Newmodel= 1 #1 = old model, 2 = new model, 3 = new model + triplets, 4 = new model + triplets + free charges 5 = something fancy that we're working on
-    titles = ['Red-Orange', 'Purple','Green-Yellow','Noir', 'Purple-Red','singlet-triplet annihilation']
-    titless = ' Some measurements model '
-    titl = titles[Newmodel]
-    
+colours = colourss[4]      #Selecting the ones I want for our plotting 
+array = ['Thin film','Weighted averages','Triplet-included','Free-charges included', 'singlet-triplet annihilation']
+Newmodel= 1 #1 = old model, 2 = new model, 3 = new model + triplets, 4 = new model + triplets + free charges 5 = something fancy that we're working on
+titles = ['Red-Orange', 'Purple','Green-Yellow','Noir', 'Purple-Red','singlet-triplet annihilation']
+titless = ' Some measurements model '
+titl = titles[Newmodel]
+ocolour = ['#fff7bc','#fe9929','#ec7014','#cc4c02']  #This is for the populations / kinetics section, gives a few orange and purple colours to plot with
+pcolour = ['#efedf5','#807dba','#6a51a3','#54278f']
+
+
+#%% Definitions and all that jazz 
 #Solving for diffusion lengths
 def Ld(q):
     Diffusion_Length = (np.sqrt((3*q)/(2*np.pi*R0)))*1e6  #Very quick way to call and calculate the diffusion length calculation because I got
     return Diffusion_Length                               #Tired of writing it out every time
 
 # ODE system
-def dP_dt(t, P, i0):        #Change in excitation over time, as described in the SI (hopefully)
+def dP_dt(t, P, i0):        #Change in excitation over time, as described in the SI
     S, T, Ic = P            #This utilises all the decay constants of different pathways, and is called in the triplet model 
     sigma = (150e-15) / (2 * np.sqrt(2 * np.log(2)))
     excitation = i0 * norm.pdf(t, loc=.5e-12, scale=sigma)
@@ -166,8 +167,19 @@ def dP_dt5(t, P, i0):      #Adding this so I can plot 2 values of knr at once (b
         krad1 * (S + S_hot)
     ]
 
+def dP_dt6(t, P, i0):   #Final dp/dt, used in the population plotting section
+    S, T, Ic = P
+    #sigma = (600e-12) / (2 * np.sqrt(2 * np.log(2)))
+    #excitation = i0 * norm.pdf(t, loc=.5e-9, scale=sigma)
+    sigma = (150e-15) / (2 * np.sqrt(2 * np.log(2)))
+    excitation = i0 * norm.pdf(t, loc=.5e-12, scale=sigma)
+    return [
+        excitation - (kradnr) * S +  .5*ktta * T**2 - kb * S**2,
+        kisc*S+kts*S**2 - ktta*T**2-ktr*T,#kisc*S - ktta*T**2-ktr*T
+        krad * (S)
+    ]
 
-#Just something to plot the data, for all models / datapoints
+#Just something to plot the data, for all models / datapoints (not used as much as I initially thought, but removing is too much work for this late into the project)
 def Plot(data, model, fluence, title, Diffusion_length, colour, Simulated):    
     ax.scatter(fluence, data, color = colour, label = title) #+ ' data')
     ax.plot(Simulated, model, color = colour, label = 'model of '+ str(round(int(Diffusion_length),-1)) + ' nm $L_{D}$')
@@ -178,7 +190,7 @@ def Norm(x):
     # x1 = ((x-x.min(0))/(x[0]))
     return x1
 
-#Exponential decay fitting for TCSPC plot, might not be used in final version
+#Exponential decay fitting for TCSPC plot, need to find a way to use this on the tri-exponential non-irf-deconvoluted files?
 def multi_exp(t, A1, tau1, A2, tau2, C):
     return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2)+ C
 
@@ -186,6 +198,7 @@ def multi_exp(t, A1, tau1, A2, tau2, C):
 def Den(x):
     y= x*1e-6*wavelength*(1-10**(-OD))/(h*c*ft*1e-7)
     return y
+
 #Does a minor adjustment of the datapoints where a change in power-meter sensitivity is visible, 99% of the time this is not called
 def SenAdj(Unadjusted_Analysis, Point1, Point2, Newlist, peak1, peak2):
     T1 = sum(np.transpose((Unadjusted_Analysis)[Point1:Point2]))
@@ -195,6 +208,7 @@ def SenAdj(Unadjusted_Analysis, Point1, Point2, Newlist, peak1, peak2):
     v = sum((np.concatenate((T3, T4), axis=1))[peak1:peak2])
     Analysis3 = (v/(Newlist))/(v[0]/(Newlist)[0])
     return Analysis3
+
 #Reads off file path, does analysis / adjustments, then does modelling based on 'NewModel' variable, then plots both data and model. Probably overengineered
 #This uses os.walk to direct to your file path so you don't need to move the code into the folder to run it, just input the path of the folder
 def Read(filepath, pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a, spotsize_b, Sensitivity_adjust, title, D1, D2, NewModel, colour, normv, time_PL):
@@ -225,7 +239,8 @@ def Read(filepath, pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a, spotsiz
     fluence_sim_cm_uJ = np.logspace(-2, 3, len(Analysis))                      #Simulated values of fluence used in plotting smoother lines for the models
     fluence_sim = fluence_sim_cm_uJ # Convert µJ/cm² to J/m²                   #Doesn't do anything?
     N_0 = (fluence_sim)/ (h * c / wavelength)                                  #
-    DensSim = Den(N_0* 1e-20)  
+    DensSim = Den(N_0* 1e-20)
+
 #Based on input value, it will plot this data using one of 4 models: normal OD, theorised better model, model with triplets, and model with free charges
     if NewModel == 1:
         Model(Dens, Norm(Analysis), tamma, title, Fluence, colour, DensSim, fluence_sim_cm_uJ, normv) #Inputting the calculated densities, analysis, tamma values, fluence and name of plot into model    
@@ -245,8 +260,7 @@ def Read(filepath, pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a, spotsiz
 #          z0      z1      z2       z3         z4              z5        z6     z7    z8     z9     z10
 
 #Models the old thin-film approximation. Worth noting that the model is called and the error is calculated, and then a simulated model is plotted
-#This isn't how I originally wanted to do it but the actual modelled values were based on datapoints, so the line wasn't smooth
-#
+#This isn't how I originally wanted to do it but the actual modelled values were based on datapoints, so the line wasn't presentable (had visible jags)
 def Model(Densities, Analysis, tammavalues, title, Fluenceujcm, colour, Simulated, fluence_sim_cm_uJ, normv):
     t = np.array([[((np.log(1+(x*y)))/(x*y)) for x in Densities] for y in tammavalues])
     Eran = np.array([sum((Analysis-(Norm(Z)))**2) for Z in t])
@@ -254,11 +268,16 @@ def Model(Densities, Analysis, tammavalues, title, Fluenceujcm, colour, Simulate
     mintam = tamma[(np.where(Eran == Eran.min())[0])]
     Diffusion_length = Ld(mintam)
     t1 = np.array([((np.log(1+(x*mintam)))/(x*mintam)) for x in Simulated*11])
+    
     #Plotting for error analysis 
     if ErrorPlot ==1:
         plt.plot(Ld(tammavalues), Eran, label = title + ' fitting error analysis', color = colour, lw=2)  
+        print(title)
+        Plusminus = Ld(tamma[np.where(Eran < Eran.min()*3)][0]) - Ld(tamma[np.where(Eran < Eran.min()*1.3)][-1])
+        print(Plusminus/2)
+        
     if ThreeinOne ==0 and ErrorPlot ==0 and TestForTamir ==0: #When we're not doing ThreeinOne or Errorplot we plot normally ala:
-        Plot(Analysis, Norm(t1)*normv, Fluenceujcm,title, Diffusion_length, colour, fluence_sim_cm_uJ*0.4)
+        Plot(Analysis, Norm(t1)*normv, Fluenceujcm,title, Diffusion_length, colour, fluence_sim_cm_uJ*0.4)        
     if ThreeinOne ==1: #Plotting only a line using the singlet only model
         ax.plot(fluence_sim_cm_uJ*0.38, Norm(t1)*normv, color = '#feb24c', label ='Singlets-only model',zorder=0)
     if TestForTamir ==1: #Plotting 50nm and 70nm plots on crystal to show difference
@@ -300,7 +319,6 @@ def Model3(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         thickness_xtal = 160e-9
         dx = thickness_xtal / slice_number
         N_0 = ((((Simulated*1e-9)/100)/(np.pi*S1*1e-4*S2*1e-4)) / (h * c / wavelength))
-        # N_0 = 1e-7*Simulated / (h * c / wavelength)
         P0 = [0,0,0]
         eta_rho = [] # Compute eta_rho
         for N_0_j in N_0: ##note N-0 is now in carriers per cubic cm! (to fit with the rate constants)
@@ -321,8 +339,6 @@ def Model3(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         if VaryISC ==0 and VaryTTA == 0 and VaryKTS==0:
             if ThreeinOne ==0:
                 Plot(Analysis, Norm(ModelFin), Fluenceujcm, title, Diffusion_length, colour, fluence_sim_cm_uJ*0.4)
-                # ax.scatter(Fluenceujcm, Analysis, color = '#b30000', label = title) #+ ' data')
-                # ax.plot(fluence_sim_cm_uJ*0.4, Norm(ModelFin), color = '#e34a33', label = 'Singlet + triplet model, 70 nm',zorder=0)
             if ThreeinOne ==1:
                 ax.plot(fluence_sim_cm_uJ*0.38, Norm(ModelFin), color = '#fd8d3c', label ='Singlet + triplet model',zorder=0)
         if VaryTTA == 1:
@@ -364,8 +380,7 @@ def Model4(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         print(Diffusion_length)
         ax.scatter(Fluenceujcm, Analysis, color = '#b30000', label = title) #+ ' data')
         ax.plot(fluence_sim_cm_uJ*0.4, Norm(ModelFin), color = '#cccccc', label = 'model of '+ str(round(int(Diffusion_length),-1)) + ' nm $L_{D}$')
-
-        # Compute eta_rho
+        
         eta_rho = []
         for N_0_j in N_0: ##note N-0 is now in carriers per cubic cm! (to fit with the rate constants)
             eta_rho_i = []
@@ -380,7 +395,6 @@ def Model4(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         ModelFin = np.array(eta_rho)/max(eta_rho)
         Diffusion_length = 1e9*np.sqrt(6*kb1*1e-6*(1/kradnr12)/(np.pi*4*1.5e-9))
         print(Diffusion_length)
-        
         ax.plot(fluence_sim_cm_uJ*0.4, Norm(ModelFin), color = '#006837', label = 'model of '+ str(round(int(Diffusion_length),-1)) + ' nm $L_{D}$')
         
     else:
@@ -390,9 +404,7 @@ def Model4(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         dx = thickness_xtal / slice_number
         N_0 = ((((Simulated*1e-9)/1000)/(np.pi*S1*1e-4*S2*1e-4)) / (h * c / wavelength))*13
         Q0=0
-        # Initial conditions
         P0 = [0, 0, 0, 0, 0, Q0, 0]
-        # Compute eta_rho
         eta_rho = []
         for N_0_j in N_0: ##note N-0 is now in carriers per cubic cm! (to fit with the rate constants)
             eta_rho_i = []
@@ -407,7 +419,6 @@ def Model4(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         ModelFin = np.array(eta_rho)/max(eta_rho)
         Diffusion_length = 1e9*np.sqrt(6*kb*1e-6*(1/kradnr)/(np.pi*4*1.5e-9))
         if ThreeinOne ==0:
-            # ax.plot(fluence_sim_cm_uJ*0.38, Norm(ModelFin), color = '#fdcc8a', label ='Free-charge model, 70 nm',zorder=0)
             Plot(Analysis, Norm(ModelFin), Fluenceujcm, title, Diffusion_length, colour, fluence_sim_cm_uJ*0.38) #Values are plot with a simulated fluence, not what
         if ThreeinOne ==1:                                                                                       #was used in the model calculation
             ax.plot(fluence_sim_cm_uJ*0.38, Norm(ModelFin), color = '#f03b20', label ='Free-charge model',zorder=0)
@@ -419,12 +430,9 @@ def Model5(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         slice_number = 3
         num = np.arange(slice_number)
         thickness_xtal = 160e-9
-        dx = thickness_xtal / slice_number                                                                   
-       
-        # N_0 = 1e-6*fluence_sim_cm_uJ / (h * c / wavelength)
+        dx = thickness_xtal / slice_number
         N_0 = ((((Simulated*1e-9)/100)/(np.pi*S1*1e-4*S2*1e-4)) / (h * c / wavelength))
         P0 = [0,0,0]
-        
         eta_rho = []
         for N_0_j in N_0: 
             eta_rho_i = []
@@ -464,11 +472,8 @@ def Model5(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
         num = np.arange(slice_number)
         thickness_xtal = 160e-9
         dx = thickness_xtal / slice_number                                                                   
-       
-        # N_0 = 1e-6*fluence_sim_cm_uJ / (h * c / wavelength)
         N_0 = ((((Simulated*1e-9)/100)/(np.pi*S1*1e-4*S2*1e-4)) / (h * c / wavelength))
         P0 = [0,0,0]
-        
         eta_rho = []
         for N_0_j in N_0: 
             eta_rho_i = []
@@ -486,39 +491,37 @@ def Model5(Pre_adj_fluence, Analysis, title, Fluenceujcm, colour,S1,S2, Simulate
        ##Similar to model 3, checks if we're varying and if we are, doesnt' do the normal plot
         if VarySTA == 0:    
             Plot(Analysis, Norm(ModelFin), Fluenceujcm, title, Diffusion_length, colour, fluence_sim_cm_uJ*0.38)
-            # ax.plot(fluence_sim_cm_uJ*0.38, Norm(ModelFin), color = '#fc8d59', label = 'Singlet-triplet annihilation model, 60 nm', zorder=0)
         else:
-            stupid  = ksta2/kb2
+            stupid  = ksta2/kb2   ##This is the only way I could figure out how to give the multiplicative value (or the way I found before I gave up)
             ax.plot(fluence_sim_cm_uJ*0.38, Norm(ModelFin), color = colour, label = str(float("%.2g" % stupid)), zorder=0)
 
 #This plots a series of different graphs of all the data (film 1+2, cystal 1+2) on one graph, and with every colour scheme
 #The FC and triplet models take a long time to run, so I wrote this to plot all different versions of the graphs with one button press, so I could grab coffee
-#While the code is running
+#While the code is running. Terrible and barely used: possibly remove?
 def SavePlot(x, titles, titless, Newmodel, number):
     colours = colourss[x]
     titl = titles[x]
     TTitle = ['Cannot-be-called-no-0-model','Singlet-only','Optical depth','Triplet-included','Free-charge model','singlet-triplet annihilation model']
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # fig.figsize=(20,12)
+    
+    ## fig = plt.figure()            
+    ## ax = fig.add_subplot(111)
+    ## fig.figsize=(20,12)
+    
+    #######Hash and unhash specific files when needed
     # title, colour = 'Film sample 1', colours[1]
-    # Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 1", 
-    #           200, 230,1400,1600, 500,800, 150, 150, True, title, 26, 28,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+    # Read(FilmTwo, 200, 230,1400,1600, 500,800, 150, 150, True, title, 26, 28,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
     #           Newmodel, colour, 1.05, time_PL)  
     
     # title, colour =  'Film sample 2', colours[3]
-    # Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 2", 
-    #             0, 1,1200,1600, 200,500, 330,430, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+    # Read(FilmOne,0, 1,1200,1600, 200,500, 330,430, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
     #             Newmodel, colour, 1.1, time_PL)  
     
     # title, colour =  'Crystal samples 2', colours[2]
-    # Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 2", 
-    #           0, 1,1400,1600, 300,600, 130,200, True, title, 13, 15, #Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+    # Read(CrytalTwo,0, 1,1400,1600, 300,600, 130,200, True, title, 13, 15, #Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
     #           Newmodel, colour, 1.15, time_PL)  
 
     title, colour = 'Crystal samples 1', colours[3]
-    Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1", 
-              0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+    Read(CrystalOne, 0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
               Newmodel, colour, 1, time_PL) 
     
     #Legend adjustment for SI plot
@@ -566,10 +569,20 @@ def MS(File_Path, title, colour, Tt,Normal,Tau1val):
     plt.xlim(0,5000), plt.ylim(0.4,1)
     plt.legend()
     if Normal == True:
-        fig.savefig('DecayTraces ' + '.svg',bbox_inches='tight')
+        Fig.savefig('DecayTraces ' + '.svg',bbox_inches='tight')
     else:
-        fig.savefig('DecayTraces non norm' + '.svg',bbox_inches='tight')
+        Fig.savefig('DecayTraces non norm' + '.svg',bbox_inches='tight')
 
+#Defining fig and ax for the defined Plot variable thingy haha look at me I almost know what I'm talking about 
+def Figload():
+    plt.figure(figsize=(10,6)) 
+    Fig = plt.figure()
+    ax = Fig.add_subplot(111)
+    Fig.figsize=(20,12)
+    plt.rcParams.update({'font.size': 12})
+    return(ax, Fig)
+
+#%% Actual plotting / analysis
 ##Un-hashing these will allow the 'read' function to be called and perform all the analysis / plotting
 #I understand calling the files every time isn't ideal, and that Jupyter can hold the values in memory, but I don't like Jupyter
 #You have to input the array values you want to use as your start and end positions for each set of analyses, if that makes sense
@@ -577,36 +590,37 @@ def MS(File_Path, title, colour, Tt,Normal,Tau1val):
 # BigPlot = 1
 # TestForTamir = 1 #Very quick thing for the SI showing a 50 and 70 nm fit for the crystal data, should remove at some point? Makes things complicated
 if BigPlot ==1: 
-    Newmodel = 5
-    # title, colour = 'Film samples 1', colours[1]
-    # z = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 1", 
-    #           200, 230,1400,1600, 500,800, 150, 150, True, title, 26, 28,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
-    #           Newmodel, colour, 1.05, time_PL) 
+    ax, Fig = Figload()
+    Newmodel = 1
+    title, colour = 'Film samples 1', colours[1]
+    z = Read(FilmOne, 200, 230,1400,1600, 500,800, 150, 150, True, title, 26, 28,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+              Newmodel, colour, 1.05, time_PL) 
     
-    # title, colour =  'Film samples 2', colours[3]
-    # z = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 2", 
-    #             0, 1,1200,1600, 200,500, 330,430, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
-                # Newmodel, colour,1.1, time_PL) 
+    title, colour =  'Film samples 2', colours[3]
+    z = Read(FilmTwo, 0, 1,1200,1600, 200,500, 330,430, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+                Newmodel, colour,1.1, time_PL) 
     
     title, colour = 'Crystal samples 1', colours[0]
-    z = Read(r'C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1', 
-              0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+    z = Read(CrystalOne,0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
               Newmodel, colour,1, time_PL) 
     
-    # title, colour =  'Crystal samples 2', colours[2]
-    # z = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 2", 
-    #           0, 1,1400,1600, 300,500, 130,200, True, title, 13, 15, #Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
-    #           Newmodel, colour, 1.15, time_PL)
-    ##Graphical adjustment things, titles / axes / font size / ticks / limits
-    ax.tick_params(axis='both', which='major', labelsize=13)
+    title, colour =  'Crystal samples 2', colours[2]
+    z = Read(CrystalTwo, 
+              0, 1,1400,1600, 300,450, 130,200, True, title, 13, 15, #Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
+              Newmodel, colour, 1.1, time_PL)
+    #Graphical adjustment things, titles / axes / font size / ticks / limits
+    ax.tick_params(axis='both', which='major', labelsize=11)
     ax.legend(frameon = False, ncol = 1, title=str(array[int((Newmodel)-1)]) + ' model')#loc='lower right'
     TTitle = ['Cannot-be-called-no-0-model','Singlet-only','Optical depth','Triplet-included','Free-charge model','singlet-triplet annihilation model']
     # ax.legend(frameon=False, ncol=1, title= str(TTitle[Newmodel])+' model')
     plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
-    # fig.savefig('varying STA.png',bbox_inches='tight')
+    Fig.savefig('Bigplot.svg',bbox_inches='tight')
     # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.svg',bbox_inches='tight') #Save the plots as png or svg as you desire
     plt.show()
+    BigPlot=0
+    if TestForTamir == 1:
+        TestForTamir = 0
 
 ###Other lines of data, useful for the weighted averages model but might not go into final paper
 ###Removed####
@@ -615,18 +629,15 @@ if BigPlot ==1:
 #Section for plotting the varying ksta values
 # VarySTA = 1
 if VarySTA == True:
-    plt.rcParams.update({'font.size': 13})
     VaryTTA, VaryISC, VaryKTS, ErrorPlot, ThreeinOne = 0,0,0,0,0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
+    ax, Fig = Figload()
     coloursInsideL = coloursInsideL = ['#fef0d9','#fdcc8a','#fc8d59','#e34a33','#b30000'][::-1]
     for l in np.arange(0,0.5, 0.1):
         print(l)
         Newmodel = 5
         ksta2 = kb2*l
         title, colour = 'Crystal 1 (Flat, new)(FC model)', coloursInsideL[int(l*10)]
-        z1 = Read(r'C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1', 
+        z1 = Read(CrystalOne, 
                   0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
                   Newmodel, colour,1, time_PL)
         ksta2 = 0.1*kb2
@@ -639,18 +650,16 @@ if VarySTA == True:
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{STA}$ multiple')
     plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
-    # fig.savefig('varying STA.svg',bbox_inches='tight')
+    Fig.savefig('varying STA.svg',bbox_inches='tight')
     plt.show()
     coloursInsideL = coloursInsideL[::-1]
+    VarySTA = 0
 
 #Section for plotting the varying ktta values
 # VaryTTA = 1
 if VaryTTA == True: 
-    plt.rcParams.update({'font.size': 13})
     VarySTA, VaryISC, VaryKTS, ThreeinOne, ErrorPlot = 0,0,0,0,0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
+    ax, Fig = Figload()
     coloursInsideL = ['#fef0d9','#fdcc8a','#fc8d59','#ef6548','#e34a33','#b30000']
     Newmodel = 3
     for l in np.arange(0,1.2, 0.2):
@@ -658,7 +667,7 @@ if VaryTTA == True:
         Placeholder = ktta
         ktta = ktta*l
         title, colour = 'Crystal 1 (Flat, new)(FC model)', coloursInsideL[int(l*5)]
-        z1 = Read(r'C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1', 
+        z1 = Read(CrystalOne, 
                   0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
                   Newmodel, colour,1, time_PL)
         ktta = Placeholder
@@ -671,17 +680,16 @@ if VaryTTA == True:
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{TTA}$ multiple')
     plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
-    # fig.savefig('varying TTA.svg',bbox_inches='tight')
+    Fig.savefig('varying TTA.svg',bbox_inches='tight')
     # # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.png',bbox_inches='tight') #Save the plots as png or svg as you desire
     plt.show()
+    VaryTTA=0
 
 # VaryISC = 1
 if VaryISC == True:
     plt.rcParams.update({'font.size': 13})
     VarySTA, VaryTTA,VaryKTS, ErrorPlot, ThreeinOne = 0,0,0,0,0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
+    ax, Fig = Figload()
     coloursInsideL = ['#fef0d9','#fdcc8a','#fc8d59','#ef6548','#e34a33','#b30000']
     Newmodel = 3
     for l in np.arange(0,1.2, 0.2):
@@ -689,7 +697,7 @@ if VaryISC == True:
         Placeholder = kisc
         kisc = kisc*l
         title, colour = 'Crystal 1 (Flat, new)(FC model)', coloursInsideL[int(l*5)]
-        z1 = Read(r'C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1', 
+        z1 = Read(CrystalOne, 
                   0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
                   Newmodel, colour,1, time_PL)
         kisc = Placeholder
@@ -701,17 +709,15 @@ if VaryISC == True:
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{isc}$ multiple') 
     plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
-    # fig.savefig('varying ISC.svg',bbox_inches='tight')
+    Fig.savefig('varying ISC.svg',bbox_inches='tight')
     # # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.png',bbox_inches='tight') #Save the plots as png or svg as you desire
     plt.show()
+    VaryISC=0
 
 # VaryKTS = 1
 if VaryKTS == True:
-    plt.rcParams.update({'font.size': 13})
     VarySTA, VaryTTA, VaryISC, ErrorPlot, ThreeinOne = 0,0,0,0,0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
+    ax, Fig = Figload()
     coloursInsideL = ['#fef0d9','#fdcc8a','#fc8d59','#ef6548','#e34a33','#b30000']
     Newmodel = 3
     for l in np.arange(0,2.4, 0.4):
@@ -719,7 +725,7 @@ if VaryKTS == True:
         Placeholder = kts
         kts = kts*l
         title, colour = 'Crystal 1 (Flat, new)(FC model)', coloursInsideL[int(l*2.5)]
-        z1 = Read(r'C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1', 
+        z1 = Read(CrystalOne, 
                   0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
                   Newmodel, colour,1, time_PL)
         kts = Placeholder
@@ -731,21 +737,18 @@ if VaryKTS == True:
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='$K_{ts}$ multiple') 
     plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 1), plt.xlim(0.1, 1000)
-    # fig.savefig('varying ts.svg',bbox_inches='tight')
+    Fig.savefig('varying ts.svg',bbox_inches='tight')
     # # fig.savefig('v'+ titl + titless + str(Newmodel)+ '.png',bbox_inches='tight') #Save the plots as png or svg as you desire
     plt.show()
+    VaryKTS=0
 
 # ThreeinOne = 1
 if ThreeinOne == True:
-    plt.rcParams.update({'font.size': 13})
     Newmodel = 0
     VaryKTS, VaryISC, VaryTTA, VarySTA, ErrorPlot, BigPlot = 0,0,0,0,0,0
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
-    plt.rcParams.update({'font.size': 13})
+    ax, Fig = Figload()
     title, colour = 'Crystal 1 (Flat, new)(FC model)', colours
-    z1 = Read(r'C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1', 
+    z1 = Read(CrystalOne, 
               0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
               Newmodel, colour,1, time_PL)
     ax.scatter(z1[10], z1[5], color = '#b30000', label = 'Crystal samples 1',zorder=1)
@@ -756,65 +759,79 @@ if ThreeinOne == True:
     ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1, title='70 nm fitting') 
     plt.xscale('log'),plt.xlabel('Fluence (μJ cm\u207B\u00B2)' ),plt.ylabel('ηPL/ηPL\u2080 (A.U)')
     plt.ylim(0, 0.75), plt.xlim(0.2, 500)
-    # fig.savefig('ThreeinOne.svg',bbox_inches='tight')
+    Fig.savefig('ThreeinOne.svg',bbox_inches='tight')
     plt.show()
+    ThreeinOne = 0
 
-# ErrorPlot = 1
+ErrorPlot = 1
 if ErrorPlot == 1:
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    fig.figsize=(20,12)
-    plt.rcParams.update({'font.size': 12})
+    ax, Fig = Figload()
     VaryTTA,VaryISC, VaryKTS, ThreeinOne, VarySTA = 0,0,0,0,0
     Newmodel = 1
     title, colour = 'Crystal samples 1', colours[0]
-    z1 = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 1", 
+    z1 = Read(CrystalOne, 
               0, 80,1200,1600, 300,600, 300,300, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
               Newmodel, colour,1, time_PL)
     title, colour =  'Crystal samples 2', colours[2]
-    z = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal samples 2", 
+    z = Read(CrystalTwo, 
               0, 1,1400,1600, 300,500, 130,200, True, title, 13, 15, #Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
               Newmodel, colour, 1.15, time_PL)
     title, colour = 'Film samples 1', colours[1]
-    z = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 1", 
+    z = Read(FilmOne, 
               200, 230,1400,1600, 500,800, 150, 150, True, title, 26, 28,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
               Newmodel, colour, 1.05, time_PL) 
     title, colour =  'Film samples 2', colours[3]
-    z = Read(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film samples 2", 
+    z = Read(FilmTwo, 
                 0, 1,1200,1600, 200,500, 330,430, False, title, 0,0,#Pump1, pump2, flat1, flat2, peak1, peak2, spotsize_a and spotsize_b, sen_adj and the title
                 Newmodel, colour,1.1, time_PL) 
     
     plt.ylim(0, 3), plt.xlim(10,150), plt.ylabel('Calculated error (A.U)'), plt.xlabel('Diffusion lengths (nm)')
     ax.legend(frameon = True, ncol = 1)#loc='lower right'
-    # fig.savefig('ErrorAnalysis.svg',bbox_inches='tight')
+    Fig.savefig('ErrorAnalysis.svg',bbox_inches='tight')
     plt.show()
+    ErrorPlot = 0
 
 # TCSPCPlot = 1
 # ModelTrue =1
 if TCSPCPlot ==1 or ModelTrue==1:
+    ax, Fig = Figload()
     colours = ['#b30000','#e34a33','#810f7c','#8856a7']
     s=20
-    x = np.genfromtxt(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\FLIM data\FLIM data for python.csv", delimiter=',')
+    x = np.genfromtxt(TCSPCData, delimiter=',')
     X=x[0:, 1:]
     xlim1, xlim2 = int(1460/64), int(10000/64) #1216 is where rise begins?
     NewTime = ((x[:,0][xlim1:xlim2])/1000)-1.608
     n=0
-    params = MDL(multi_exp).make_params(A1=4, tau1=1, A2=1, tau2=3, C=0)
+    params = MDL(multi_exp).make_params(A1=4, tau1=1, A2=1, tau2=3, C=0.016)
     title = ['Crystal samples 1', 'Crystal samples 2','Amorphous film']
     for y in np.transpose(X):
         plt.scatter(NewTime, y[xlim1:xlim2], s=s, color = colours[n], label = title[n])
         if ModelTrue==1:            
             varr= MDL(multi_exp).fit(y[xlim1:xlim2], params, t=NewTime) 
             TauWeighted = (varr.params['A1'].value*varr.params['tau1'].value+varr.params['A2'].value*varr.params['tau2'].value)/(varr.params['A1'].value+varr.params['A2'].value) 
-            plt.plot(NewTime, (MDL(multi_exp).fit(y[xlim1:xlim2], params, t=NewTime)).best_fit, color = colours[n], label=(f' weighted tau {float("%.3g" % TauWeighted)}'))
+            plt.plot(NewTime, (MDL(multi_exp).fit(y[xlim1:xlim2], params, t=NewTime)).best_fit, color = '#000000', label=(f' weighted tau {float("%.3g" % TauWeighted)}'))
+            # plt.fill_between(NewTime, varr.best_fit-varr.eval_uncertainty(t=NewTime),          ####Adds in black error bars around the fits 
+            #                   varr.best_fit+varr.eval_uncertainty(t=NewTime), color='#000000')
         n=n+1
-    ax.tick_params(axis='both', which='major', labelsize=16)
+        # if n==2:
+            # plt.plot(NewTime, (MDL(multi_exp).fit(y[xlim1:xlim2], params, t=NewTime)).best_fit, color = '#000000', label = 'fits')#label=(f' weighted tau {float("%.3g" % TauWeighted)}'))
+    ax.tick_params(axis='both', which='major', labelsize=13)
+    # handles, labels = plt.gca().get_legend_handles_labels()
+    # order = [3,0,1,2]
+    # ax.legend([handles[idx] for idx in order],[labels[idx] for idx in order],frameon=False, ncol=1)#, title='70 nm fitting') 
     ax.legend(frameon = False, ncol = 1)#loc='lower right'
-    plt.yscale('log'),plt.xlabel('Time (ns)',fontsize=16),plt.ylabel('Normalised counts',fontsize=16)
-    plt.xlim(0,8), plt.ylim(0.02, 1)
-    # fig.savefig('TCSPC data presentable format' + '.svg',bbox_inches='tight')
-    plt.show()
-        
+    plt.yscale('log'),plt.xlabel('Time (ns)',fontsize=13),plt.ylabel('Normalised counts',fontsize=13)
+    plt.xlim(0,7), plt.ylim(0.02, 1)
+    Fig.savefig('TCSPC data presentable format' + '.svg',bbox_inches='tight')
+    plt.show()    
+    result = (MDL(multi_exp).fit(y[xlim1:xlim2], params, t=NewTime))
+    x=result.fit_report()
+    # print(result.fit_report())
+    
+    if ModelTrue ==1:
+        ModelTrue=0
+    if TCSPCPlot ==1:
+        TCSPCPlot = 0
 
 ##U is what's used to change the colour of the graph, o is what's used to change the model used
 ##This will give every set of colours and every model for all the sets of data we're using in the paper
@@ -829,26 +846,31 @@ if oplot==1:
         Newmodel = v
         print(v)
         for x in u:
-            fig = plt.figure()
-            ax = fig.add_subplot(111)
-            fig.figsize=(10,6)
+            ax, Fig = Figload()
             SavePlot(x, titles, titless, Newmodel, v)
+oplot=0
 
 # Ms=1
 if Ms==1:
-    MS(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal decay trace", 'Film',  '#810f7c', 3, False,1)
-    MS(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film decay trace", 'Crystal', '#b30000', 20, False,1)
+    ## Note! These are extremely strange fits, I'm not sure why I'm fitting them anyways as I only want something to guide the eye to the general trend of the decay
+    ax, Fig = Figload()
+    MS(CrystalDecay, 'Film',  '#810f7c', 30, False,1)
+    MS(FilmDecay, 'Crystal', '#b30000', 1, False,1)
     plt.show()
-    MS(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal decay trace", 'Film, zero-one norm',  '#810f7c', 3, True,1)
-    MS(r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film decay trace", 'Crystal, zero-one norm', '#b30000', 6, True, 10)
+    ax, Fig = Figload()
+    MS(CrystalDecay, 'Film, zero-one norm',  '#810f7c',0.3, True,1)
+    MS(FilmDecay, 'Crystal, zero-one norm', '#b30000', 10, True, 10)
+    plt.ylim(0,1)
     plt.show()
+    MS=0
 
 # ModelTrue=1
 # TCSPCIntensity = 1
 if TCSPCIntensity==1:
+    ax, Fig = Figload()
     colours = ['#b30000','#e34a33']
     s=5
-    x = np.genfromtxt(r"C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\TCSPC\TEst4Pyth.csv", delimiter=',', skip_header = 1)
+    x = np.genfromtxt(TCSPCIntensityFile, delimiter=',', skip_header = 1)
     n=0
     X=x[0:, 1:]
     params = MDL(multi_exp).make_params(A1=1, tau1=1000, A2=1, tau2=1000, C=0) #Leftover from TCSPC fitting section, unsure if needed
@@ -866,12 +888,104 @@ if TCSPCIntensity==1:
     plt.yscale('log'),plt.xlabel('Time (ns)',fontsize=16),plt.ylabel('Normalised counts',fontsize=16)
     plt.xlim(0.1,6), plt.ylim(0.005, 1)
     # plt.xscale('log')
-    # fig.savefig('AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2' + '.svg',bbox_inches='tight')
+    Fig.savefig('FLuencedependenceinY6xtal' + '.svg',bbox_inches='tight')
     plt.show()
+    if ModelTrue ==1:
+        ModelTrue=0
+    if TCSPCIntensity ==1:
+        TCSPCIntensity = 0
 
+# Kinetics = 1
+if Kinetics ==1:
+        fluence_sim_uj_cm = np.array([0.1,1,10,100])
+        fluence_sim = fluence_sim_uj_cm * 1e-6 * 1e4
+        ax, Fig = Figload()
+        for i in np.arange(0, len(fluence_sim),1):
+            N_0 = 1e-6*fluence_sim[i] / (h * c / wavelength)
+            P0 = [0,0,0]
+            # Compute eta_rho
+            eta_rho = []
+            eta_rho_i = []
+            rho_0_i = N_0* (1 - np.exp(-alpha * dx)) / dx
+            sol = solve_ivp(dP_dt6, [time_PL[0], time_PL[-1]], P0, t_eval=time_PL, args=(rho_0_i,), method='BDF')
+            Ps = sol.y.T
+            S_t = Ps[:, 0]
+            T_t = Ps[:, 1]
+            ax.plot(time_PL*1e12, S_t/rho_0_i,color = pcolour[i],label = f'Singlet ({float("%.3g" % fluence_sim_uj_cm[i])} ujcm\u00b2)')
+            ax.plot(time_PL*1e12, T_t/rho_0_i,color = ocolour[i],label = f'Triplet ({float("%.3g" % fluence_sim_uj_cm[i])} ujcm\u00b2)')
+            handles,labels = ax.get_legend_handles_labels()
+            # ax.legend(handles, labels, loc='upper right')
+            ax.legend(frameon = True, ncol = 1, fontsize = 10, markerscale = 2,loc='upper right')
+            ax.set_xlabel('Time (ps)')
+            ax.set_ylabel('Normalized population')
+            # ax.set_ylim(1e-3,1)
+            plt.xscale('log')
+            ax.set_xlim(1e-1,1e7)
+        Fig.savefig('SingletTripletKinetics.svg',bbox_inches='tight')
+        plt.show()
+        
+        ax, Fig = Figload()
+        for i in np.arange(0, len(fluence_sim),1):
+            N_0 = 1e-6*fluence_sim[i] / (h * c / wavelength)
+            P0 = [0,0,0]
+            eta_rho = []
+            eta_rho_i = []
+            rho_0_i = N_0* (1 - np.exp(-alpha * dx)) / dx
+            sol = solve_ivp(dP_dt6, [time_PL[0], time_PL[-1]], P0, t_eval=time_PL, args=(rho_0_i,), method='BDF')
+            Ps = sol.y.T
+            S_t = Ps[:, 0]
+            T_t = Ps[:, 1]
+            ax.plot(time_PL*1e12, S_t/rho_0_i,color = pcolour[i],label = f'Singlet ({float("%.3g" % fluence_sim_uj_cm[i])} ujcm\u00b2)')
+            ax.plot(time_PL*1e12, T_t/rho_0_i,color = ocolour[i],label = f'Triplet ({float("%.3g" % fluence_sim_uj_cm[i])} ujcm\u00b2)')
+            handles,labels = ax.get_legend_handles_labels()
+            ax.legend(frameon = True, ncol = 1, fontsize = 10, markerscale = 2,loc='upper right')
+            ax.set_xlabel('Time (ps)')
+            ax.set_ylabel('Normalized population')
+            ax.set_ylim(1e-3,1.1)
+            plt.yscale('log')
+            plt.xscale('log')
+            ax.set_xlim(1e-1,1e7)
+        plt.show()
+        Fig.savefig('SingletTripletKineticsYNorm.svg',bbox_inches='tight')
+        Kinetics = 0
 
+# Tpopplot = 1
+if Tpopplot ==1:
+        tplot = []
+        ax, Fig = Figload()
+        # fluence_sim_uj_cm = np.array([0.001,0.01,0.1,1,10,100, 1000])
+        fluence_sim_uj_cm = np.logspace(-3,3,num=50)
+        fluence_sim = fluence_sim_uj_cm * 1e-6 * 1e4
+        for i in np.arange(0, len(fluence_sim),1):
+            N_0 = 1e-6*fluence_sim[i] / (h * c / wavelength)
+            
+            P0 = [0,0,0]
+            # Compute eta_rho
+            eta_rho = []
+             
+            eta_rho_i = []
+             
+            rho_0_i = N_0* (1 - np.exp(-alpha * dx)) / dx
+            sol = solve_ivp(dP_dt6, [time_PL[0], time_PL[-1]], P0, t_eval=time_PL, args=(rho_0_i,), method='BDF')
+            Ps = sol.y.T
+            S_t = Ps[:, 0]
+            T_t = Ps[:, 1]
+            tplot = np.append(tplot,T_t/rho_0_i)
+            sys.stdout.write('.'); sys.stdout.flush();
+            
+        ttttt= np.transpose(np.reshape(tplot,(len(fluence_sim),len(time_PL))))
+        y = fluence_sim  
+        x= [max(ttttt[:,i]) for i in np.arange(0, len(np.transpose(ttttt)),1)]
+            
+        plt.scatter(y,x,c=x, cmap='plasma_r', s=0.2)
+        plt.xscale('log')
+        plt.xlabel('Fluence in ujcm\u00b2')
+        plt.ylabel('Maximum of normalized triplet population')
+        # plt.colorbar() #Colorbar adds nothing to this plot.
+        Fig.savefig('Tripletpopulation.svg',bbox_inches='tight')
+        plt.show()
+        Tpopplot = 0
 
-# x = np.genfromtxt(r"C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\TCSPC\Comparing fluences normalised.csv", delimiter=',', skip_header = 1)
-
-
-print('All done :)')
+print(''
+      'All done :)')
+print("--- %s seconds ---" % (time.time() - start_time))
