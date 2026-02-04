@@ -273,7 +273,7 @@ def Model(Densities, Analysis, tammavalues, title, Fluenceujcm, colour, Simulate
     if ErrorPlot ==1:
         plt.plot(Ld(tammavalues), Eran, label = title + ' fitting error analysis', color = colour, lw=2)  
         print(title)
-        Plusminus = Ld(tamma[np.where(Eran < Eran.min()*3)][0]) - Ld(tamma[np.where(Eran < Eran.min()*1.3)][-1])
+        Plusminus = Ld(tamma[np.where(Eran < Eran.min()*2)][0]) - Ld(tamma[np.where(Eran < Eran.min()*2)][-1])      #Bounding errors (the plus-minus reported in the paper) as when the error value is double the minimum value
         print(Plusminus/2)
         
     if ThreeinOne ==0 and ErrorPlot ==0 and TestForTamir ==0: #When we're not doing ThreeinOne or Errorplot we plot normally ala:
@@ -989,3 +989,4 @@ if Tpopplot ==1:
 print(''
       'All done :)')
 print("--- %s seconds ---" % (time.time() - start_time))
+
