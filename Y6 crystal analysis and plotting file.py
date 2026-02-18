@@ -273,8 +273,16 @@ def Model(Densities, Analysis, tammavalues, title, Fluenceujcm, colour, Simulate
     if ErrorPlot ==1:
         plt.plot(Ld(tammavalues), Eran, label = title + ' fitting error analysis', color = colour, lw=2)  
         print(title)
-        Plusminus = Ld(tamma[np.where(Eran < Eran.min()*2)][0]) - Ld(tamma[np.where(Eran < Eran.min()*2)][-1])      #Bounding errors (the plus-minus reported in the paper) as when the error value is double the minimum value
-        print(Plusminus/2)
+        x=2 #Adjust this to adjust error values. When X=2, the plusminus is when the calculated errors are double the minimum. X=2 is used for our reported errors
+        Plusminus = Ld(tamma[np.where(Eran < Eran.min()*x)][0]) - Ld(tamma[np.where(Eran < Eran.min()*x)][-1])
+        print(Plusminus/2) #This is the value of the +/- reported in the paper
+        # print(Ld(tamma[np.where(Eran < Eran.min()*x)][0])) #Lower bound, hashed out
+        # print(Ld(tamma[np.where(Eran < Eran.min()*x)][-1])) #Upper bound, hashed out
+        print(Eran[np.where(Eran < Eran.min()*x)[0][0]])    #Prints the [0] array value from when the Eran value is double the minimum error value
+        plt.scatter(Ld(tamma[np.where(Eran < Eran.min()*x)][0]),Eran[np.where(Eran < Eran.min()*x)[0][0]],s=30, color = colour) #Lower error bound
+        plt.scatter(Ld(tamma[np.where(Eran < Eran.min()*x)][-1]),Eran[np.where(Eran < Eran.min()*x)[0][-1]],s=30, color = colour) #Upper error bound
+        plt.fill_between(Ld(tamma[np.where(Eran == Eran.min()*x)]), Eran[np.where(Eran < Eran.min()*x)[0][0]], Eran[np.where(Eran < Eran.min()*x)[0][-1]], color='black', alpha=0) #This line doesn't do anything
+                                                                                                                                                                                   #, or if it does it's not visible
         
     if ThreeinOne ==0 and ErrorPlot ==0 and TestForTamir ==0: #When we're not doing ThreeinOne or Errorplot we plot normally ala:
         Plot(Analysis, Norm(t1)*normv, Fluenceujcm,title, Diffusion_length, colour, fluence_sim_cm_uJ*0.4)        
@@ -989,4 +997,5 @@ if Tpopplot ==1:
 print(''
       'All done :)')
 print("--- %s seconds ---" % (time.time() - start_time))
+
 
