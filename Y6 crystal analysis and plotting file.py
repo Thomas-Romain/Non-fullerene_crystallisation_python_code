@@ -186,7 +186,7 @@ def Plot(data, model, fluence, title, Diffusion_length, colour, Simulated):
     
 #A shortcut to normalise something 
 def Norm(x):
-    x1 = (x - x.min(0))/(x.ptp(0))
+    x1 = (x - x.min(0))/np.ptp(x, 0) #changed from x.ptp(0) as I was using numpy 1.26.4 or something like that, and x.ptp(0) was changed to be np.ptp(x,0) instead. Have made it so it will run on modern numpy
     # x1 = ((x-x.min(0))/(x[0]))
     return x1
 
@@ -997,5 +997,6 @@ if Tpopplot ==1:
 print(''
       'All done :)')
 print("--- %s seconds ---" % (time.time() - start_time))
+
 
 
