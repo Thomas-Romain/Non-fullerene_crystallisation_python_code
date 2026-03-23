@@ -1,5 +1,5 @@
 # Non-fullerene_crystallisation_python_code
-Data and code related to the paper "Polar aromatic crystallization solvents for large, dense non-fullerene crystals with record carrier diffusion lengths". 
+Data and code related to the paper "Record carrier diffusion lengths in large, dense non-fullerene electron acceptor crystals grown by rapid evaporation of polar aromatic solvents". 
 
 I've tried to comment the code as best I can, to make it legible, however this was my first foray into coding so there's a few things that might be illogical / hard to parse. 
 Please feel free to get in touch @ thomas.romain@bristol.ac.uk, I will try to provide any information where I can
