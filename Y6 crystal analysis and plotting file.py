@@ -9,6 +9,7 @@ from scipy.integrate import solve_ivp
 from lmfit import Model as MDL  #For fitting TCSPC data?
 import sys            #Some models take a very long time to calculate, this is input so I know they're still running even if nothing is happening 
 import time
+from matplotlib.patches import Polygon
 
 start_time = time.time()
 
@@ -38,6 +39,7 @@ TCSPCData = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY dat
 CrystalDecay = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Crystal decay trace"                #Filepath for Crystal decay trace
 FilmDecay = r"C:\Users\bn23289\OneDrive - University of Bristol\Desktop\PLQY data\Film decay trace"                      #Filepath for Film decay trace
 TCSPCIntensityFile = r"C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\TCSPC\TEst4Pyth.csv"             #Filepath for high and low fluence TCSPC data
+BoxandWhiskerFile = r"C:\Users\bn23289\OneDrive - University of Bristol\Documents\Data\TCSPC\BoxW Larger areas"          #Filepath for box and whisker plot for revisions
 
 #Rate constants for the triplet-model
 krad = 2.3e8 #was 2.3e8 prior to edge crystal adjustment
@@ -84,7 +86,7 @@ kradnr12 = krad1 + knr12
 tau = 1e9*(1/kradnr2)
     
 ##Defining these things for changing plots. Keep these as 0, edit the ones below the loading-the-data section to keep things sensible
-ErrorPlot, VaryISC, VaryTTA, VarySTA, VaryKTS, ThreeinOne, TCSPCPlot, BigPlot, TestForTamir, oplot, ModelTrue, Ms, TCSPCIntensity, Kinetics, Tpopplot= 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+ErrorPlot, VaryISC, VaryTTA, VarySTA, VaryKTS, ThreeinOne, TCSPCPlot, BigPlot, TestForTamir, oplot, ModelTrue, Ms, TCSPCIntensity, Kinetics, Tpopplot, BoxP = 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
     
 #A few minor things, defining colours and titles for saving the graphs more efficiently (saving values in the 'bigplot' section to a model name)
 colourss = [['#fdcc8a','#fc8d59','#e34a33','#b30000','#fef0d9'], #Red/orange    0     A series of colour schemes to plot the graphs with. 
@@ -100,7 +102,7 @@ titless = ' Some measurements model '
 titl = titles[Newmodel]
 ocolour = ['#fff7bc','#fe9929','#ec7014','#cc4c02']  #This is for the populations / kinetics section, gives a few orange and purple colours to plot with
 pcolour = ['#efedf5','#807dba','#6a51a3','#54278f']
-
+box_colors = ['#b3cde3','#800026','#bd0026','#e31a1c','#fc4e2a']  #Some nice colours for the boxplot (nice is subjective)
 
 #%% Definitions and all that jazz 
 #Solving for diffusion lengths
@@ -590,6 +592,89 @@ def Figload():
     plt.rcParams.update({'font.size': 12})
     return(ax, Fig)
 
+def BoxPlotOther(FolderName, TestVariable, Plot): #This is an edited version of the matplotlib documentation style boxplotter, maybe 10% of this is original work?
+    NameArray,WTauArray,Tau1Array,Tau2Array, KPlot = [],[],[],[],[]
+    for directory, subdirectories, files in os.walk(FolderName):
+            params = MDL(multi_exp).make_params(A1=4, tau1=1, A2=1, tau2=3, C=0.016)
+            wtau, tau1, tau2=[],[],[]
+            k = []
+            for file in files:
+                x = np.genfromtxt(os.path.join(directory, file), delimiter=',', skip_header = 1)[TestVariable:] #Cutting off early times
+                X=x[0:, 1:] #Reshaping
+                varr= MDL(multi_exp).fit(np.transpose(X), params,t=((np.transpose(x)[0])/1000)) #Fitting biexp model to data
+                Tau1, Tau2 = varr.params['tau1'].value, varr.params['tau2'].value #Tau1 and 2 from varr (fitted model)
+                TauWeighted = (varr.params['A1'].value*Tau1+varr.params['A2'].value*Tau2)/(varr.params['A1'].value+varr.params['A2'].value) #Calc wtau
+                k1 = np.sqrt(sum(np.transpose((((MDL(multi_exp).fit(np.transpose(X), params,t=((np.transpose(x)[0])/1000))).best_fit) - np.transpose(X)))**2))
+                k.append(k1)
+                Include = 0.2>k1>0.05 #Change these values to change which values get included and excluded. Noisy = outside range so excluded
+                if Plot==True:
+                    ### Try to eliminate noisy data
+                    fig, ax1 = plt.subplots(figsize=(10, 6))
+                    plt.plot(((np.transpose(x)[0])/1000), (MDL(multi_exp).fit(np.transpose(X), params,t=((np.transpose(x)[0])/1000))).best_fit)
+                    plt.scatter(((np.transpose(x)[0])/1000), np.transpose(X), s=10)
+                    ax1.set(title= f'{k1}'+ f' and {Include}')
+                    plt.show()
+                if Include==1:
+                    wtau.append(TauWeighted),tau1.append(Tau1),tau2.append(Tau2) #Appending to arrays
+            KPlot.append(k)        
+            NameArray.append(directory[90:]),WTauArray.append(wtau),Tau1Array.append(tau1),Tau2Array.append(tau2) #Cut off the filepath from file name and append everything 
+            ArrayArray = [WTauArray[1:], Tau1Array[1:],Tau2Array[1:]]
+            Names = NameArray[1:]
+            Varr = ['WTau','Tau1','Tau2']
+    for o in range(len(ArrayArray)):
+    # x,o=1,0 ##Here for troubleshooting fitting parameters, unhash these two and hash out 'for o in range(....'
+    # if x==1:
+        Variable = Varr[o]
+        data = ArrayArray[o]
+        fig, ax1 = plt.subplots(figsize=(10, 6))  #I could use figload here right? It seems to not work when I do, unsure as to why.
+        fig.canvas.manager.set_window_title('A Boxplot Example')
+        medianprops = dict(linestyle='-', linewidth=0, color='blue')
+        bp = ax1.boxplot(data, notch=False, sym='+', orientation='vertical', whis=1.5, medianprops=medianprops,showfliers=False)
+        plt.setp(bp['boxes'], color='black')
+        plt.setp(bp['whiskers'], color='black')
+        plt.setp(bp['fliers'], color='red', marker='+')
+        # Add a horizontal grid to the plot, but make it very light in color
+        # so we can use it for reading data values but not be distracting
+        ax1.yaxis.grid(True, linestyle='-', which='major', color='lightgrey',alpha=0.5)
+        ax1.set(axisbelow=True, title= f'Box and Whisker for {Variable}', ylabel='Lifetime (ns)')    
+        ax1.set_xticklabels(Names, rotation=45, fontsize=10)
+        # Now fill the boxes with desired colors
+        num_boxes = len(data)
+        medians = np.empty(num_boxes)
+        for i in range(num_boxes):
+                    box = bp['boxes'][i]
+                    box_x,box_y  = [],[]
+                    for j in range(5):
+                        box_x.append(box.get_xdata()[j])
+                        box_y.append(box.get_ydata()[j])
+                    box_coords = np.column_stack([box_x, box_y])
+                    ax1.add_patch(Polygon(box_coords, facecolor=box_colors[i]))
+                    med = bp['medians'][i]
+                    median_x = []
+                    median_y = []
+                    for j in range(2):
+                        median_x.append(med.get_xdata()[j])
+                        median_y.append(med.get_ydata()[j])
+                        ax1.plot(median_x, median_y, 'k')
+                    medians[i] = median_y[0]
+                    ax1.plot(np.average(med.get_xdata()), np.average(data[i]),
+                             color='w', marker='*', markeredgecolor='k')
+        # ax1.set_ylim(0.2, 2.5)  #Forces graph within a specific boundary to avoid visible issues with data (poorly phrased)
+        #Add upper X-axis tick labels with the sample medians to aid in comparison     
+        pos = np.arange(num_boxes) + 1
+        upper_labels = [str(round(s, 2)) for s in medians] #(just use two decimal places of precision)
+        weights = ['bold', 'semibold']
+        for tick, label in zip(range(num_boxes), ax1.get_xticklabels()):
+                    k = tick % 2
+                    ax1.text(pos[tick], .95, upper_labels[tick],
+                             transform=ax1.get_xaxis_transform(),
+                             horizontalalignment='center', size='small',
+                             weight=weights[k], color=box_colors[tick])
+        NamesActual = ['Semi-crystalline','Phenol','PhenolZ','Watch','Watch Long']
+        for n in range(len(Names)): #Plots the boxy legend in bottom right corner, unsure if needed with x-axis ticks. Adjust pos with first 2 numbers
+                fig.text(0.133, (0.14+0.04*n), str(NamesActual[n]),backgroundcolor=box_colors[n], color='black', weight='roman', size='medium') #Changing the value of 0.14 plots the legend at a different height. 
+        plt.show()                                                                                                                              #Plotting a legend in this may might not be necessary tbh
+
 #%% Actual plotting / analysis
 ##Un-hashing these will allow the 'read' function to be called and perform all the analysis / plotting
 #I understand calling the files every time isn't ideal, and that Jupyter can hold the values in memory, but I don't like Jupyter
@@ -993,6 +1078,11 @@ if Tpopplot ==1:
         Fig.savefig('Tripletpopulation.svg',bbox_inches='tight')
         plt.show()
         Tpopplot = 0
+
+BoxP = 1
+if BoxP ==1:
+    BoxPlotOther(BoxandWhiskerFile, 600, 0)
+    BoxP =0
 
 print(''
       'All done :)')
