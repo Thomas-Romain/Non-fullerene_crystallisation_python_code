@@ -592,13 +592,14 @@ def Figload():
     plt.rcParams.update({'font.size': 12})
     return(ax, Fig)
 
-def BoxPlotOther(FolderName, TestVariable, Plot): #This is an edited version of the matplotlib documentation style boxplotter, maybe 10% of this is original work?
+def BoxPlotOther(FolderName, TestVariable, Plot, TV2, TF):
     NameArray,WTauArray,Tau1Array,Tau2Array, KPlot = [],[],[],[],[]
     for directory, subdirectories, files in os.walk(FolderName):
             params = MDL(multi_exp).make_params(A1=4, tau1=1, A2=1, tau2=3, C=0.016)
             wtau, tau1, tau2=[],[],[]
             k = []
             for file in files:
+                print(file)
                 x = np.genfromtxt(os.path.join(directory, file), delimiter=',', skip_header = 1)[TestVariable:] #Cutting off early times
                 X=x[0:, 1:] #Reshaping
                 varr= MDL(multi_exp).fit(np.transpose(X), params,t=((np.transpose(x)[0])/1000)) #Fitting biexp model to data
@@ -606,40 +607,37 @@ def BoxPlotOther(FolderName, TestVariable, Plot): #This is an edited version of 
                 TauWeighted = (varr.params['A1'].value*Tau1+varr.params['A2'].value*Tau2)/(varr.params['A1'].value+varr.params['A2'].value) #Calc wtau
                 k1 = np.sqrt(sum(np.transpose((((MDL(multi_exp).fit(np.transpose(X), params,t=((np.transpose(x)[0])/1000))).best_fit) - np.transpose(X)))**2))
                 k.append(k1)
-                Include = 0.2>k1>0.05 #Change these values to change which values get included and excluded. Noisy = outside range so excluded
-                if Plot==True:
-                    ### Try to eliminate noisy data
-                    fig, ax1 = plt.subplots(figsize=(10, 6))
-                    plt.plot(((np.transpose(x)[0])/1000), (MDL(multi_exp).fit(np.transpose(X), params,t=((np.transpose(x)[0])/1000))).best_fit)
-                    plt.scatter(((np.transpose(x)[0])/1000), np.transpose(X), s=10)
-                    ax1.set(title= f'{k1}'+ f' and {Include}')
-                    plt.show()
-                if Include==1:
-                    wtau.append(TauWeighted),tau1.append(Tau1),tau2.append(Tau2) #Appending to arrays
+                if (0.2>k1>TV2)==1:
+                    wtau.append(TauWeighted),tau1.append(Tau1),tau2.append(Tau2) #Appending to arrays 
             KPlot.append(k)        
-            NameArray.append(directory[90:]),WTauArray.append(wtau),Tau1Array.append(tau1),Tau2Array.append(tau2) #Cut off the filepath from file name and append everything 
+            NameArray.append(directory[81:]),WTauArray.append(wtau),Tau1Array.append(tau1),Tau2Array.append(tau2)
             ArrayArray = [WTauArray[1:], Tau1Array[1:],Tau2Array[1:]]
-            Names = NameArray[1:]
             Varr = ['WTau','Tau1','Tau2']
     for o in range(len(ArrayArray)):
-    # x,o=1,0 ##Here for troubleshooting fitting parameters, unhash these two and hash out 'for o in range(....'
-    # if x==1:
+        if TF==1:
+            x,o=1,0
+        if TF==2:
+            x,o=1,1
+        if TF==3:
+            x,o=1,2
+        else:
+            x,o=x,o
+        NamesActual = ['crystal samples 1, region 1','crystal samples 1, region 2','crystal samples 2, region 1','crystal samples 2, region 2']
         Variable = Varr[o]
         data = ArrayArray[o]
-        fig, ax1 = plt.subplots(figsize=(10, 6))  #I could use figload here right? It seems to not work when I do, unsure as to why.
+        fig, ax1 = plt.subplots(figsize=(10, 6))
         fig.canvas.manager.set_window_title('A Boxplot Example')
         medianprops = dict(linestyle='-', linewidth=0, color='blue')
         bp = ax1.boxplot(data, notch=False, sym='+', orientation='vertical', whis=1.5, medianprops=medianprops,showfliers=False)
-        plt.setp(bp['boxes'], color='black')
-        plt.setp(bp['whiskers'], color='black')
-        plt.setp(bp['fliers'], color='red', marker='+')
+        plt.setp(bp['boxes'], color='black'),plt.setp(bp['whiskers'], color='black'),plt.setp(bp['fliers'], color='red', marker='+')
         # Add a horizontal grid to the plot, but make it very light in color
         # so we can use it for reading data values but not be distracting
         ax1.yaxis.grid(True, linestyle='-', which='major', color='lightgrey',alpha=0.5)
-        ax1.set(axisbelow=True, title= f'Box and Whisker for {Variable}', ylabel='Lifetime (ns)')    
-        ax1.set_xticklabels(Names, rotation=45, fontsize=10)
+        ax1.set(axisbelow=True, title= f'Box and Whisker for {Variable} and f{TestVariable}', ylabel='Counts')    
+        ax1.set_xticklabels(NamesActual, rotation=45, fontsize=10)
         # Now fill the boxes with desired colors
         num_boxes = len(data)
+        box_colors = ['#b3cde3','#800026','#bd0026','#e31a1c','#fc4e2a']
         medians = np.empty(num_boxes)
         for i in range(num_boxes):
                     box = bp['boxes'][i]
@@ -657,23 +655,11 @@ def BoxPlotOther(FolderName, TestVariable, Plot): #This is an edited version of 
                         median_y.append(med.get_ydata()[j])
                         ax1.plot(median_x, median_y, 'k')
                     medians[i] = median_y[0]
-                    ax1.plot(np.average(med.get_xdata()), np.average(data[i]),
-                             color='w', marker='*', markeredgecolor='k')
-        # ax1.set_ylim(0.2, 2.5)  #Forces graph within a specific boundary to avoid visible issues with data (poorly phrased)
         #Add upper X-axis tick labels with the sample medians to aid in comparison     
         pos = np.arange(num_boxes) + 1
         upper_labels = [str(round(s, 2)) for s in medians] #(just use two decimal places of precision)
         weights = ['bold', 'semibold']
-        for tick, label in zip(range(num_boxes), ax1.get_xticklabels()):
-                    k = tick % 2
-                    ax1.text(pos[tick], .95, upper_labels[tick],
-                             transform=ax1.get_xaxis_transform(),
-                             horizontalalignment='center', size='small',
-                             weight=weights[k], color=box_colors[tick])
-        NamesActual = ['Semi-crystalline','Phenol','PhenolZ','Watch','Watch Long']
-        for n in range(len(Names)): #Plots the boxy legend in bottom right corner, unsure if needed with x-axis ticks. Adjust pos with first 2 numbers
-                fig.text(0.133, (0.14+0.04*n), str(NamesActual[n]),backgroundcolor=box_colors[n], color='black', weight='roman', size='medium') #Changing the value of 0.14 plots the legend at a different height. 
-        plt.show()                                                                                                                              #Plotting a legend in this may might not be necessary tbh
+        plt.show()                                                                                                                             #Plotting a legend in this may might not be necessary tbh
 
 #%% Actual plotting / analysis
 ##Un-hashing these will allow the 'read' function to be called and perform all the analysis / plotting
@@ -1081,7 +1067,7 @@ if Tpopplot ==1:
 
 BoxP = 1
 if BoxP ==1:
-    BoxPlotOther(BoxandWhiskerFile, 600, 0)
+    BoxPlotOther(BoxandWhiskerFile, 600, 0,0.04, 0) #File, cutoff, noise filter, and "plot all or just WTau")
     BoxP =0
 
 print(''
